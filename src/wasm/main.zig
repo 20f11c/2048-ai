@@ -1,10 +1,10 @@
-// WASM 小程序版 v4 —— 直接复用 engine.Expectimax, 100% 与原生 CLI 算法一致
+// WASM 小程序版 v6 — 与原生 CLI 完全一致的算法，增大搜索预算
 // 导出 5 个函数:
-//   init()                                  -> void
-//   search(board_data: u64)                 -> i32       返回方向: 0上 1右 2下 3左, -1无解
-//   applyMove(board_data: u64, dir: u32)    -> u64       应用移动后的新棋盘
-//   addRandomTile(board_data: u64, rng)     -> u64       随机空格填子
-//   countEmpty(board_data: u64)             -> u32       返回空格数
+//   init()                                         -> void
+//   search(board_data: u64)                        -> i32   (0上 1右 2下 3左, -1无解)
+//   applyMove(board_data: u64, dir: u32)           -> u64
+//   addRandomTile(board_data: u64, rng: u32)       -> u64
+//   countEmpty(board_data: u64)                    -> u32
 
 const engine = @import("engine");
 const Board = engine.Board;
@@ -15,11 +15,11 @@ const Expectimax = engine.Expectimax;
 var move_table: Board.MoveTable = undefined;
 var heuristic: Heuristic = undefined;
 
-// BFS 预算: 1 << 19 = 524288 Board ≈ 4MB (与原 CLI 默认完全相同)
-const BFS_BUFFER_LEN = 1 << 19;
+// 关键改进: 增大 BFS 预算 (2M = 原 CLI 的 4 倍)
+const BFS_BUFFER_LEN = 1 << 21;
 var bfs_buffer: [BFS_BUFFER_LEN]Board align(4096) = undefined;
 
-// Expectimax 转置表 (2^18 = 262144 条目 ≈ 3.5MB)
+// 转置表: 2^18 = 262144 条目
 var expectimax_cache: Expectimax(Heuristic, true).Cache = undefined;
 
 // --- 导出函数 ---
@@ -36,12 +36,21 @@ export fn search(board_data: u64) i32 {
     const board = Board{ .data = board_data };
 
     const moves = move_table.getMoves(board);
-    const valid = board.filterMoves(&moves);
-    if (valid.len == 0) return -1;
+    var valid_count: u8 = 0;
+    var valid_boards: [4]Board = undefined;
+    inline for (0..4) |dir| {
+        if (moves[dir].data != board.data) {
+            valid_boards[valid_count] = moves[dir];
+            valid_count += 1;
+        }
+    }
+    if (valid_count == 0) return -1;
 
+    // 先做 BFS 动态分配深度
     var bfs = Bfs.new(bfs_buffer[0..], &move_table);
-    const depth = bfs.expand(valid.moves[0..valid.len]).depth + 1;
+    const depth = bfs.expand(valid_boards[0..valid_count]).depth + 1;
 
+    // Expectimax 搜索
     const expect = Expectimax(Heuristic, true){
         .move_table = &move_table,
         .heuristic = heuristic,
@@ -59,9 +68,9 @@ export fn applyMove(board_data: u64, dir: u32) u64 {
     return moves[d].data;
 }
 
-export fn addRandomTile(board_data: u64, rng_val: u32) u64 {
+export fn addRandomTile(board_data: u64, rng: u32) u64 {
     const board = Board{ .data = board_data };
-    return board.addTileInternal(rng_val).data;
+    return board.addTileInternal(rng).data;
 }
 
 export fn countEmpty(board_data: u64) u32 {
