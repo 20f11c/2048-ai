@@ -1,10 +1,7 @@
-// WASM 小程序版 v6 — 与原生 CLI 完全一致的算法，增大搜索预算
-// 导出 5 个函数:
-//   init()                                         -> void
-//   search(board_data: u64)                        -> i32   (0上 1右 2下 3左, -1无解)
-//   applyMove(board_data: u64, dir: u32)           -> u64
-//   addRandomTile(board_data: u64, rng: u32)       -> u64
-//   countEmpty(board_data: u64)                    -> u32
+// WASM: 2048 AI 引擎 —— 微信小程序 / Node.js / 浏览器
+// 编译: zig build --release=fast  →  zig-out/main.wasm
+// 栈大小: build.zig 中设置 8MB，匹配 native CLI 性能与质量
+// 导出: init() + search() + applyMove() + addRandomTile() + countEmpty()
 
 const engine = @import("engine");
 const Board = engine.Board;
@@ -15,14 +12,10 @@ const Expectimax = engine.Expectimax;
 var move_table: Board.MoveTable = undefined;
 var heuristic: Heuristic = undefined;
 
-// 关键改进: 增大 BFS 预算 (2M = 原 CLI 的 4 倍)
-const BFS_BUFFER_LEN = 1 << 21;
+const BFS_BUFFER_LEN = 1 << 19; // 524288, 与原生 CLI 相同
 var bfs_buffer: [BFS_BUFFER_LEN]Board align(4096) = undefined;
 
-// 转置表: 2^18 = 262144 条目
 var expectimax_cache: Expectimax(Heuristic, true).Cache = undefined;
-
-// --- 导出函数 ---
 
 export fn init() void {
     move_table.init();
@@ -34,8 +27,8 @@ export fn init() void {
 
 export fn search(board_data: u64) i32 {
     const board = Board{ .data = board_data };
-
     const moves = move_table.getMoves(board);
+
     var valid_count: u8 = 0;
     var valid_boards: [4]Board = undefined;
     inline for (0..4) |dir| {
@@ -46,11 +39,9 @@ export fn search(board_data: u64) i32 {
     }
     if (valid_count == 0) return -1;
 
-    // 先做 BFS 动态分配深度
     var bfs = Bfs.new(bfs_buffer[0..], &move_table);
     const depth = bfs.expand(valid_boards[0..valid_count]).depth + 1;
 
-    // Expectimax 搜索
     const expect = Expectimax(Heuristic, true){
         .move_table = &move_table,
         .heuristic = heuristic,
