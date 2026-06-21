@@ -3,12 +3,14 @@ const Heuristic = @This();
 score_table: [65536]f32,
 
 const LOST_PENALTY = 200000.0;
-const MONO_POWER = 4.0;
-const MONO_WEIGHT = 47.0;
-const SUM_POWER = 3.5;
-const SUM_WEIGHT = 11.0;
-const MERGES_WEIGHT = 700.0;
-const EMPTY_WEIGHT = 270.0;
+
+const MONO_POWER = 3.0;
+const MONO_WEIGHT = 10.0;
+const SUM_POWER = 2.5;
+const SUM_WEIGHT = 18.0;
+const MERGES_WEIGHT = 500.0;
+const EMPTY_WEIGHT = 500.0;
+const TILE_2048_WEIGHT = 8000.0;
 
 pub fn init(self: *Heuristic) void {
   const pow_tables = comptime pow_tables: {
@@ -41,6 +43,7 @@ pub fn init(self: *Heuristic) void {
     var sum: f32 = 0;
     var empty: u32 = 0;
     var merges: u32 = 0;
+    var count_2048: u32 = 0;
 
     var prev: u4 = 0;
     var counter: u32 = 0;
@@ -48,10 +51,12 @@ pub fn init(self: *Heuristic) void {
     inline for (line) |rank| {
       sum += pow_tables.sum[rank];
 
+      if (rank == 11) count_2048 += 1;
+
       if (rank == 0) {
         empty += 1;
       } else {
-        if (prev == rank) {
+        if (prev == rank and rank < 11) {
           counter += 1;
         } else if (counter > 0) {
           merges += 1 + counter;
@@ -78,11 +83,14 @@ pub fn init(self: *Heuristic) void {
       }
     }
 
+    const _2048_bonus = @as(f32, @floatFromInt(count_2048)) * TILE_2048_WEIGHT;
+
     entry.* = LOST_PENALTY +
       EMPTY_WEIGHT * @as(f32, @floatFromInt(empty)) +
-      MERGES_WEIGHT * @as(f32, @floatFromInt(merges)) -
-      MONO_WEIGHT * @min(mono_left, mono_right) -
-      SUM_WEIGHT * sum;
+      MERGES_WEIGHT * @as(f32, @floatFromInt(merges)) +
+      SUM_WEIGHT * sum +
+      _2048_bonus -
+      MONO_WEIGHT * @min(mono_left, mono_right);
   }
 }
 
@@ -98,6 +106,8 @@ pub fn evaluate(self: *const Heuristic, board: Board) f32 {
 
     score += self.score_table[row] + self.score_table[col];
   }
+
+  score += board.layoutBonus2048();
 
   return score;
 }

@@ -116,7 +116,7 @@ pub const MoveTable = struct {
       while (i < 4) : (i -%= 1) {
         if (line[i] == 0) continue;
 
-        if (!merged and furthest < 4 and line[i] == line[furthest]) {
+        if (!merged and furthest < 4 and line[i] == line[furthest] and line[i] < 11) {
           line[furthest] = line[furthest] +| 1;
           line[i] = 0;
           merged = true;
@@ -204,6 +204,34 @@ pub fn maxTile(self: Board) u4 {
   }
 
   return result;
+}
+
+pub fn countRank(self: Board, target_rank: u4) u4 {
+  var data = self.data;
+  var count: u4 = 0;
+  for (0..16) |_| {
+    if (@as(u4, @truncate(data)) == target_rank) count += 1;
+    data >>= 4;
+  }
+  return count;
+}
+
+pub fn layoutBonus2048(self: Board) f32 {
+  const weights: [16]f32 = .{
+    1500.0,   400.0,   400.0,  1500.0,
+     400.0,  -800.0,  -800.0,   400.0,
+     400.0,  -800.0,  -800.0,   400.0,
+    1500.0,   400.0,   400.0,  1500.0,
+  };
+
+  var bonus: f32 = 0;
+  const data = self.data;
+  inline for (0..16) |pos| {
+    if (@as(u4, @truncate(data >> (60 - pos * 4))) == 11) {
+      bonus += weights[pos];
+    }
+  }
+  return bonus;
 }
 
 pub fn score(self: Board, four_count: u32) u32 {
