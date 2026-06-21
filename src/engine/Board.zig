@@ -68,6 +68,25 @@ pub fn addTile(self: Board, rng: *Fmc256) struct { Board, u1 } {
   };
 }
 
+/// 简化版填子：用简单 u32 作为 RNG（WASM 用）
+pub fn addTileInternal(self: Board, rng: u32) Board {
+  const mask = self.emptyPos();
+  const empty_count: u32 = @popCount(mask);
+  if (empty_count == 0) return self;
+
+  const idx = rng % empty_count;
+  const rank: u1 = if ((rng >> 16) % 10 == 0) 1 else 0;
+
+  var t = mask;
+  var i: u32 = 0;
+  while (i < idx) : (i += 1) {
+    t &= t - 1;
+  }
+  const pos_bit = t & -%t;
+
+  return .{ .data = self.data | (pos_bit << rank) };
+}
+
 pub inline fn new(rng: *Fmc256) struct { Board, u2 } {
   const board: Board = .{ .data = 0 };
   const board1, const is_four1 = board.addTile(rng);
