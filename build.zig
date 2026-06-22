@@ -77,6 +77,21 @@ pub fn build(b: *std.Build) void {
 
   b.getInstallStep().dependOn(&artifact.step);
 
+  // ============ 动态库 ============
+  const lib = b.addLibrary(.{
+    .name = "lib2048",
+    .root_module = b.createModule(.{
+      .root_source_file = b.path("src/lib.zig"),
+      .target = target,
+      .optimize = optimize,
+      .strip = strip,
+    }),
+    .linkage = .dynamic,
+  });
+  const lib_out = lib.getEmittedBin();
+  const lib_install = b.addInstallFile(lib_out, "lib2048.so");
+  b.getInstallStep().dependOn(&lib_install.step);
+
   // ============ 服务器 ============
   const server_exe = b.addExecutable(.{
     .name = "server",
