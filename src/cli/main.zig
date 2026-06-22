@@ -49,7 +49,7 @@ pub fn main(init: std.process.Init) !void {
             return;
         };
 
-        try writer.print("{d}\n", .{@intCast(dir)});
+        try writer.print("{d}\n", .{@as(u32, @intCast(dir))});
         try writer.flush();
         return;
     }
@@ -133,7 +133,7 @@ const engine = @import("engine");
 const Board = engine.Board;
 const Heuristic = engine.Heuristic;
 const Bfs = engine.Bfs;
-const Expectimax = engine.Expectimax;
+const Expectimax = engine.Expectimax(Heuristic, true, 18);
 
 const Args = @import("Args.zig");
 const Worker = @import("Worker.zig");
