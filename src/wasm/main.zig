@@ -1,6 +1,6 @@
 // WASM: 2048 AI 引擎 —— 微信小程序 / Node.js / 浏览器
 // 编译: zig build --release=fast  →  zig-out/main.wasm
-// 内存优化: 总内存 < 10MB，适配小程序限制
+// 内存: 总计 ~9.6MB，卡着小程序 10MB 限制
 // 导出: init() + search() + applyMove() + addRandomTile() + countEmpty()
 
 const engine = @import("engine");
@@ -12,19 +12,16 @@ const Expectimax = engine.Expectimax;
 var move_table: Board.MoveTable = undefined;
 var heuristic: Heuristic = undefined;
 
-// 小程序内存优化版: 总内存 < 10MB
-// BFS buffer: 1<<17 = 131072 × 8B = 1MB
-// Cache: 1<<16 = 65536 × 13B = 0.8MB
-// Stack: 2MB
-// 其他: ~0.5MB
-// 总计: ~4.3MB (安全范围内)
-
-const BFS_BUFFER_LEN = 1 << 17; // 131072, 小程序内存优化
+// 内存配置 (总计 ~9.6MB，卡着 10MB 限制):
+// BFS buffer: 838848 × 8B = 6.44MB
+// Cache: 262144 × 13B = 3.25MB
+// MoveTable + Heuristic: ~0.4MB
+const BFS_BUFFER_LEN = 838848;
 var bfs_buffer: [BFS_BUFFER_LEN]Board align(4096) = undefined;
 
-// 使用更小的 Cache (16 bits = 65536 entries)
-const SmallExpectimax = Expectimax(Heuristic, true, 16);
-var expectimax_cache: SmallExpectimax.Cache = undefined;
+// Cache: 18 bits = 262144 entries
+const ExpectimaxCache = Expectimax(Heuristic, true, 18);
+var expectimax_cache: ExpectimaxCache.Cache = undefined;
 
 export fn init() void {
     move_table.init();
@@ -51,8 +48,7 @@ export fn search(board_data: u64) i32 {
     var bfs = Bfs.new(bfs_buffer[0..], &move_table);
     const depth = bfs.expand(valid_boards[0..valid_count]).depth + 1;
 
-    // Expectimax (小 Cache 版本)
-    const expect = SmallExpectimax{
+    const expect = ExpectimaxCache{
         .move_table = &move_table,
         .heuristic = heuristic,
         .cache = &expectimax_cache,

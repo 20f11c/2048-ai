@@ -70,7 +70,7 @@ pub fn build(b: *std.Build) void {
 
   wasm_main.rdynamic = true;
   wasm_main.entry = .disabled;
-  // 小程序内存限制: 栈 2MB (总内存 < 10MB)
+  // 小程序内存: 栈 2MB，数据内存 ~9.6MB，总计 ~11.6MB
   wasm_main.stack_size = 2 * 1024 * 1024;
   const bin = wasm_main.getEmittedBin();
   const artifact = b.addInstallFile(bin, "main.wasm");
