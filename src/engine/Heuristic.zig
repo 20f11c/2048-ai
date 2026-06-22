@@ -7,10 +7,10 @@ const LOST_PENALTY = 200000.0;
 const MONO_POWER = 3.0;
 const MONO_WEIGHT = 10.0;
 const SUM_POWER = 2.5;
-const SUM_WEIGHT = 18.0;
-const MERGES_WEIGHT = 500.0;
-const EMPTY_WEIGHT = 500.0;
-const TILE_2048_WEIGHT = 8000.0;
+const SUM_WEIGHT = 20.0;
+const MERGES_WEIGHT = 600.0;
+const EMPTY_WEIGHT = 600.0;
+const TILE_2048_WEIGHT = 15000.0; // 大幅提高 2048 奖励
 
 pub fn init(self: *Heuristic) void {
   const pow_tables = comptime pow_tables: {

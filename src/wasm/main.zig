@@ -12,7 +12,7 @@ const Expectimax = engine.Expectimax;
 var move_table: Board.MoveTable = undefined;
 var heuristic: Heuristic = undefined;
 
-const BFS_BUFFER_LEN = 1 << 19; // 524288, 与原生 CLI 相同
+const BFS_BUFFER_LEN = 1 << 20; // 1048576, 增大预算提高搜索深度
 var bfs_buffer: [BFS_BUFFER_LEN]Board align(4096) = undefined;
 
 var expectimax_cache: Expectimax(Heuristic, true).Cache = undefined;
