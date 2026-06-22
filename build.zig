@@ -85,6 +85,12 @@ pub fn build(b: *std.Build) void {
       .target = target,
       .optimize = optimize,
       .strip = strip,
+      .imports = &.{
+        .{
+          .name = "engine",
+          .module = engine,
+        },
+      },
     }),
   });
 
