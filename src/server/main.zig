@@ -111,11 +111,15 @@ fn doSearch(state: *ThreadState, board_data: u64) i32 {
     return @intCast(dir);
 }
 
+fn closeFd(fd: i32) void {
+    _ = os.close(fd);
+}
+
 fn handleClient(fd: i32, state: *ThreadState) void {
     var req_buf: [32768]u8 = undefined;
     const n = readAll(fd, &req_buf);
     if (n == 0) {
-        os.close(fd);
+        closeFd(fd);
         return;
     }
 
@@ -128,7 +132,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
         const header = std.fmt.bufPrint(&header_buf, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n\r\n", .{body.len}) catch "";
         writeAll(fd, header);
         writeAll(fd, body);
-        os.close(fd);
+        closeFd(fd);
         return;
     }
 
@@ -136,7 +140,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
     if (std.mem.startsWith(u8, req, "OPTIONS")) {
         const header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n\r\n";
         writeAll(fd, header);
-        os.close(fd);
+        closeFd(fd);
         return;
     }
 
@@ -153,7 +157,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
             const header = std.fmt.bufPrint(&header_buf, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n\r\n", .{body.len}) catch "";
             writeAll(fd, header);
             writeAll(fd, body);
-            os.close(fd);
+            closeFd(fd);
             return;
         }
 
@@ -166,7 +170,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
             const header = std.fmt.bufPrint(&header_buf, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n\r\n", .{body.len}) catch "";
             writeAll(fd, header);
             writeAll(fd, body);
-            os.close(fd);
+            closeFd(fd);
             return;
         }
 
@@ -175,7 +179,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
         const header = std.fmt.bufPrint(&header_buf, "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\n\r\n", .{body.len}) catch "";
         writeAll(fd, header);
         writeAll(fd, body);
-        os.close(fd);
+        closeFd(fd);
         return;
     }
 
@@ -184,7 +188,7 @@ fn handleClient(fd: i32, state: *ThreadState) void {
     const header = std.fmt.bufPrint(&header_buf, "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {d}\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\n\r\n", .{body.len}) catch "";
     writeAll(fd, header);
     writeAll(fd, body);
-    os.close(fd);
+    closeFd(fd);
 }
 
 const BFS_BUF_SIZE = 838848;
@@ -211,12 +215,12 @@ pub fn main() !void {
     _ = std.mem.zeroes([8]u8);
 
     if (os.bind(sock_fd, @ptrCast(&addr), @sizeOf(@TypeOf(addr))) != 0) {
-        os.close(sock_fd);
+        _ = os.close(sock_fd);
         return error.BindFailed;
     }
 
     if (os.listen(sock_fd, 128) != 0) {
-        os.close(sock_fd);
+        _ = os.close(sock_fd);
         return error.ListenFailed;
     }
 
@@ -236,7 +240,7 @@ pub fn main() !void {
     while (true) {
         var client_addr: std.posix.sockaddr.in = undefined;
         var addr_len: std.posix.socklen_t = @sizeOf(std.posix.sockaddr.in);
-        const client_fd_raw = os.accept(sock_fd, @ptrCast(&client_addr), &addr_len, 0);
+        const client_fd_raw = os.accept(sock_fd, @ptrCast(&client_addr), &addr_len);
         if (client_fd_raw < 0) continue;
         const client_fd: i32 = @intCast(client_fd_raw);
 
