@@ -70,8 +70,8 @@ pub fn build(b: *std.Build) void {
 
   wasm_main.rdynamic = true;
   wasm_main.entry = .disabled;
-  // 增大 WASM 栈到 8MB (默认为 1MB)，防止 BFS sort 和 Expectimax 递归导致栈溢出
-  wasm_main.stack_size = 8 * 1024 * 1024;
+  // 小程序内存限制: 栈 2MB (总内存 < 10MB)
+  wasm_main.stack_size = 2 * 1024 * 1024;
   const bin = wasm_main.getEmittedBin();
   const artifact = b.addInstallFile(bin, "main.wasm");
 

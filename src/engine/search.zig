@@ -1,7 +1,7 @@
-pub fn Expectimax(Eval: type, comptime transposition: bool) type {
+pub fn Expectimax(Eval: type, comptime transposition: bool, comptime cache_bits: u8 = 18) type {
   return struct {
     pub const Cache = if (transposition) struct {
-      const CACHE_BITS = 18;
+      const CACHE_BITS = cache_bits;
       const CACHE_SIZE = 1 << CACHE_BITS;
 
       depths: [CACHE_SIZE]u8,
