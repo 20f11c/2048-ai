@@ -76,4 +76,23 @@ pub fn build(b: *std.Build) void {
   const artifact = b.addInstallFile(bin, "main.wasm");
 
   b.getInstallStep().dependOn(&artifact.step);
+
+  // ============ 服务器 ============
+  const server_exe = b.addExecutable(.{
+    .name = "server",
+    .root_module = b.createModule(.{
+      .root_source_file = b.path("src/server/main.zig"),
+      .target = target,
+      .optimize = optimize,
+      .strip = strip,
+    }),
+  });
+
+  b.installArtifact(server_exe);
+
+  const server_cmd = b.addRunArtifact(server_exe);
+  server_cmd.step.dependOn(b.getInstallStep());
+  if (b.args) |args| server_cmd.addArgs(args);
+  const server_run = b.step("server", "Run the AI HTTP server");
+  server_run.dependOn(&server_cmd.step);
 }
