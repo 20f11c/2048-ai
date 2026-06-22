@@ -1,158 +1,162 @@
 const Args = @This();
 
 const Param = enum {
-  iterations,
-  budget,
-  threads,
-  help,
-  seed,
+    iterations,
+    budget,
+    threads,
+    help,
+    seed,
+    search_only,
 };
 
 const Seed = struct {
-  static: ?u256,
-  dynamic: []const u8,
+    static: ?u256,
+    dynamic: []const u8,
 
-  fn parse(input: ?[]const u8, io: std.Io) !Seed {
-    if (input) |dynamic| {
-      return .{
-        .static = std.fmt.parseUnsigned(u256, dynamic, 0) catch null,
-        .dynamic = dynamic,
-      };
-    } else {
-      var seed: u256 = undefined;
-      std.Io.random(io, @ptrCast(&seed));
-      return .{
-        .static = seed,
-        .dynamic = "",
-      };
+    fn parse(input: ?[]const u8, io: std.Io) !Seed {
+        if (input) |dynamic| {
+            return .{
+                .static = std.fmt.parseUnsigned(u256, dynamic, 0) catch null,
+                .dynamic = dynamic,
+            };
+        } else {
+            var seed: u256 = undefined;
+            std.Io.random(io, @ptrCast(&seed));
+            return .{
+                .static = seed,
+                .dynamic = "",
+            };
+        }
     }
-  }
 
-  pub fn toRng(self: *const Seed) Fmc256 {
-    if (self.static) |seed| {
-      return .fromSeed(Fmc256.toParts(seed));
-    } else {
-      return .fromBytes(self.dynamic);
+    pub fn toRng(self: *const Seed) Fmc256 {
+        if (self.static) |seed| {
+            return .fromSeed(Fmc256.toParts(seed));
+        } else {
+            return .fromBytes(self.dynamic);
+        }
     }
-  }
 };
 
 const paramMap = StringMap(Param).init(.{
-  .@"--iter" = .iterations,
-  .@"--budget" = .budget,
-  .@"--threads" = .threads,
-  .@"--seed" = .seed,
-  .@"--help" = .help,
+    .@"--iter" = .iterations,
+    .@"--budget" = .budget,
+    .@"--threads" = .threads,
+    .@"--seed" = .seed,
+    .@"--help" = .help,
+    .@"--search-only" = .search_only,
 
-  .@"-i" = .iterations,
-  .@"-b" = .budget,
-  .@"-t" = .threads,
-  .@"-s" = .seed,
-  .@"-h" = .help,
+    .@"-i" = .iterations,
+    .@"-b" = .budget,
+    .@"-t" = .threads,
+    .@"-s" = .seed,
+    .@"-h" = .help,
 });
 
 iterations: u32,
 budget: u32,
 threads: u32,
 seed: Seed,
+search_only: ?[]const u8 = null,
 
 fn getValue(arg: []const u8, iter: *std.process.Args.Iterator, writer: *std.Io.Writer) ![]const u8 {
-  return iter.next() orelse {
-    try writer.print("Error: Missing value for parameter '{s}'\n", .{ arg });
-    try writer.flush();
-    return error.MissingParameterValue;
-  };
+    return iter.next() orelse {
+        try writer.print("Error: Missing value for parameter '{s}'\n", .{arg});
+        try writer.flush();
+        return error.MissingParameterValue;
+    };
 }
 
 fn getU32(arg: []const u8, iter: *std.process.Args.Iterator, writer: *std.Io.Writer) !u32 {
-  const value = try getValue(arg, iter, writer);
+    const value = try getValue(arg, iter, writer);
 
-  const uint = std.fmt.parseUnsigned(u32, value, 10) catch |e| {
-    try writer.print("Error: Invalid value '{s}' for parameter '{s}'", .{ value, arg });
-    try writer.flush();
-    return e;
-  };
+    const uint = std.fmt.parseUnsigned(u32, value, 10) catch |e| {
+        try writer.print("Error: Invalid value '{s}' for parameter '{s}'", .{ value, arg });
+        try writer.flush();
+        return e;
+    };
 
-  return uint;
+    return uint;
 }
 
 pub fn parse(init: std.process.Init) !Args {
-  var buffer: [4096]u8 = undefined;
-  var stderr: std.Io.File.Writer = .init(.stderr(), init.io, &buffer);
-  const writer = &stderr.interface;
+    var buffer: [4096]u8 = undefined;
+    var stderr: std.Io.File.Writer = .init(.stderr(), init.io, &buffer);
+    const writer = &stderr.interface;
 
-  var args = try init.minimal.args.iterateAllocator(init.arena.allocator());
-  if (!args.skip()) return error.NoProgramName;
+    var args = try init.minimal.args.iterateAllocator(init.arena.allocator());
+    if (!args.skip()) return error.NoProgramName;
 
-  var iterations: u32 = 1;
-  var budget: u32 = 1 << 19;
-  var threads: ?u32 = null;
-  var seed_input: ?[]const u8 = null;
+    var iterations: u32 = 1;
+    var budget: u32 = 1 << 19;
+    var threads: ?u32 = null;
+    var seed_input: ?[]const u8 = null;
+    var search_only: ?[]const u8 = null;
 
-  while (args.next()) |arg| {
-    if (paramMap.get(arg)) |param| {
-      switch (param) {
-        .iterations => iterations = try getU32(arg, &args, writer),
-        .budget => budget = try getU32(arg, &args, writer),
-        .threads => threads = try getU32(arg, &args, writer),
-        .seed => seed_input = try getValue(arg, &args, writer),
-        .help => {
-          try writer.print(
-            (
-              \\Usage: 2048 [options]
-              \\
-              \\Options:
-              \\  -i, --iter <u32>     Number of iterations (default: 1)
-              \\  -b, --budget <u32>   Processing budget (default: 524288)
-              \\  -t, --threads <u32>  Number of threads (default: auto)
-              \\  -s, --seed <bytes>   Seed for the PRNG (default: random)
-              \\  -h, --help           Display this help message
-              \\
-            ), .{}
-          );
-          try writer.flush();
-          return error.HelpIssued;
-        },
-      }
-    } else {
-      try writer.print("Error: Unknown parameter '{s}'\n", .{ arg });
-      try writer.flush();
-      return error.UnknownParameter;
+    while (args.next()) |arg| {
+        if (paramMap.get(arg)) |param| {
+            switch (param) {
+                .iterations => iterations = try getU32(arg, &args, writer),
+                .budget => budget = try getU32(arg, &args, writer),
+                .threads => threads = try getU32(arg, &args, writer),
+                .seed => seed_input = try getValue(arg, &args, writer),
+                .search_only => search_only = try getValue(arg, &args, writer),
+                .help => {
+                    try writer.print(
+                        (
+                            \\Usage: 2048 [options]
+                            \\
+                            \\Options:
+                            \\  -i, --iter <u32>      Number of iterations (default: 1)
+                            \\  -b, --budget <u32>    Processing budget (default: 524288)
+                            \\  -t, --threads <u32>   Number of threads (default: auto)
+                            \\  -s, --seed <bytes>    Seed for the PRNG (default: random)
+                            \\  --search-only <board> Search single board, return direction
+                            \\  -h, --help            Display this help message
+                            \\
+                        ), .{}
+                    );
+                    try writer.flush();
+                    return error.HelpIssued;
+                },
+            }
+        } else {
+            try writer.print("Error: Unknown parameter '{s}'\n", .{arg});
+            try writer.flush();
+            return error.UnknownParameter;
+        }
     }
-  }
 
-  return .{
-    .iterations = iterations,
-    .budget = budget,
-    .seed = try .parse(seed_input, init.io),
-    .threads = @max(1, @min(
-      threads orelse @as(u32, @intCast(try std.Thread.getCpuCount())),
-      iterations,
-    )),
-  };
+    return .{
+        .iterations = iterations,
+        .budget = budget,
+        .seed = try .parse(seed_input, init.io),
+        .threads = @max(1, @min(
+            threads orelse @as(u32, @intCast(try std.Thread.getCpuCount())),
+            iterations,
+        )),
+        .search_only = search_only,
+    };
 }
 
 pub fn display(self: Args, writer: *std.Io.Writer) !void {
-  try writer.writeAll("================== CONFIGURATION =================\n");
-  try writer.print("Iterations : {d}\n", .{ self.iterations });
-  try writer.print("Budget     : {d}\n", .{ self.budget });
-  try writer.print("Threads    : {d}\n", .{ self.threads });
+    try writer.writeAll("================== CONFIGURATION =================\n");
+    try writer.print("Iterations : {d}\n", .{self.iterations});
+    try writer.print("Budget     : {d}\n", .{self.budget});
+    try writer.print("Threads    : {d}\n", .{self.threads});
 
-  if (self.seed.static) |s| {
-    if (self.seed.dynamic.len == 0) {
-      // Case 1: Randomly generated seed (print the number in hex)
-      try writer.print("Seed:      : 0x{x}\n", .{ s });
+    if (self.seed.static) |s| {
+        if (self.seed.dynamic.len == 0) {
+            try writer.print("Seed:      : 0x{x}\n", .{s});
+        } else {
+            try writer.print("Seed:      : {s}\n", .{self.seed.dynamic});
+        }
     } else {
-      // Case 2: User provided a numeric string
-      try writer.print("Seed:      : {s}\n", .{ self.seed.dynamic });
+        try writer.print("Seed:      : \"{s}\"\n", .{self.seed.dynamic});
     }
-  } else {
-    // Case 3: User provided a byte string (non-numeric)
-    try writer.print("Seed:      : \"{s}\"\n", .{ self.seed.dynamic });
-  }
 
-  try writer.writeAll("==================================================\n\n");
-  try writer.flush();
+    try writer.writeAll("==================================================\n\n");
+    try writer.flush();
 }
 
 const std = @import("std");
